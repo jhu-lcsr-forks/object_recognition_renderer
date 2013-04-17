@@ -53,6 +53,7 @@ if (${USE_GLUT})
                                              ${OPENGL_LIBRARIES}
                                              ${GLUT_LIBRARIES}
                                              freeimage
+                                             boost_program_options
   )
   if (ROS_GROOVY_FOUND)
   install(TARGETS ${PROJECT_NAME}_glut
@@ -75,6 +76,7 @@ else()
                                                ${OpenCV_LIBRARIES}
                                                OSMesa GLU
                                                freeimage
+                                               boost_program_options
   )
   if (ROS_GROOVY_FOUND)
   install(TARGETS ${PROJECT_NAME}_osmesa
