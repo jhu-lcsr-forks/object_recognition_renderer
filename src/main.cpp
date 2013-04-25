@@ -39,6 +39,7 @@
 #include <stdlib.h>
 
 #include <boost/format.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
@@ -49,18 +50,49 @@
 #include <object_recognition_renderer/renderer_osmesa.h>
 #endif
 
+void write_images(
+    int index, cv::FileStorage &poses_output_file,
+    cv::Matx33d &R, cv::Vec3d &p,
+    cv::Mat &image, cv::Mat &depth, cv::Mat &mask)
+{
+  // Store the transform in the yaml file
+  poses_output_file << "{:";
+
+  poses_output_file << "p" << "[:";
+  for(int c=0; c<3; c++) {
+    poses_output_file << p(c);
+  }
+  poses_output_file <<"]";
+
+  poses_output_file << "R" << "[:";
+  for(int r=0; r<3; r++) {
+    for(int c=0; c<3; c++) {
+      poses_output_file << R(r,c);
+    }
+  }
+  poses_output_file << "]";
+
+  poses_output_file << "}";
+
+  // Write out the images
+  cv::imwrite(boost::str(boost::format("depth_%05d.png") % (index)), depth);
+  cv::imwrite(boost::str(boost::format("image_%05d.png") % (index)), image);
+  cv::imwrite(boost::str(boost::format("mask_%05d.png") % (index)), mask);
+}
+
 int
 main(int argc, char **argv)
 {
   // Parse arguments
   namespace po = boost::program_options;
+  namespace fs = boost::filesystem;
 
   po::options_description desc("Allowed options");
   desc.add_options()
     ("help", "produce help message")
     ("width", po::value<int>()->default_value(640), "image width")
     ("height", po::value<int>()->default_value(480), "image height")
-    ("near", po::value<double>()->default_value(0.1), "renderer near plane")
+    ("near", po::value<double>()->default_value(0.01), "renderer near plane")
     ("far", po::value<double>()->default_value(1000.0), "renderer far plane")
     ("fx", po::value<double>()->default_value(525), "focal length (x)")
     ("fy", po::value<double>()->default_value(525), "focal length (y)")
@@ -68,6 +100,7 @@ main(int argc, char **argv)
     ("verbose", po::value<int>()->default_value(1), "verbose output (statusbar, etc)")
     ("mesh-file", po::value<std::string>()->required(), "mesh to use to generate views")
     ("steps", po::value<int>()->default_value(150), "number of render steps")
+    ("poses", po::value<std::string>()->default_value(std::string("")), "Path to a pose yaml file")
     ;
 
   po::positional_options_description pdesc;
@@ -105,80 +138,126 @@ main(int argc, char **argv)
 #else
   RendererOSMesa renderer = RendererOSMesa(vm["mesh-file"].as<std::string>());
 #endif
-
   renderer.set_parameters(width, height, focal_length_x, focal_length_y, near, far);
 
-  RendererIterator renderer_iterator = RendererIterator(&renderer, steps);
-
-  cv::Mat image, depth, mask;
-  cv::Matx33d R;
-  cv::Vec3d T;
+  // Working variables
+  int n_poses = 0;
 
   // Open the yaml file
-  cv::FileStorage poses_f("render_info.yml", cv::FileStorage::WRITE);
+  cv::FileStorage poses_output_file("render_info.yml", cv::FileStorage::WRITE);
 
   // Store the configuration
-  poses_f 
+  poses_output_file 
     << "width" << width
     << "height" << height
     << "near" << near
     << "far" << far
     << "fx" << focal_length_x
-    << "fy" << focal_length_y;
+    << "fy" << focal_length_y
+    << "filename_format" << "%05d";
 
-  // Store the final number of poses in the yaml file
-  int n_templates = (int)renderer_iterator.n_templates();
-  poses_f << "n_poses" << n_templates;
-  poses_f << "filename_format" << "%05d";
+  // Read pre-computed poses if possible
+  if(vm["poses"].as<std::string>().size() > 0) {
+    // Load yaml file with metadata and poses
+    fs::path poses_yaml_path = fs::path(vm["poses"].as<std::string>().c_str());
+    cv::FileStorage poses_input_file(poses_yaml_path.string(), cv::FileStorage::READ);
 
-  // Begin the list of poses in the yaml file
-  poses_f << "poses" << "[";
+    // Store the final number of poses in the yaml file
+    poses_input_file["n_poses"] >> n_poses;
+    poses_output_file << "n_poses" << n_poses;
 
-  size_t i = 0;
+    // Load the poses from file
+    std::cerr<<"Generating "<<n_poses<<" poses..."<<std::endl;
 
-  for (i = 0; !renderer_iterator.isDone(); ++i, ++renderer_iterator)
-  {
-    // Output status
-    if(verbose) {
-      std::cout<<"\x1B[2K"<<"\x1B[0E";
-      std::cout<<(boost::format("%6.2f%% complete...") % (100.0*i/double(n_templates)));
-      std::flush(std::cout);
-    }
+    int pose_index = 0;
+    cv::FileNode poses = poses_input_file["poses"];
 
-    renderer_iterator.render(image, depth, mask);
+    // Begin the list of poses in the yaml file
+    poses_output_file << "poses" << "[";
 
-    // Get transform
-    R = renderer_iterator.R();
-    T = renderer_iterator.T();
+    // Extract the poses and load the images for each pose
+    for(cv::FileNodeIterator pose_it = poses.begin();
+        pose_it != poses.end();
+        ++pose_it, pose_index++ )
+    {
+      cv::Mat image, depth, mask;
+      cv::Matx33d R;
+      cv::Vec3d p;
 
-    // Store the transform in the yaml file
-    poses_f << "{:";
-
-    poses_f << "R" << "[:";
-    for(int r=0; r<3; r++) {
-      for(int c=0; c<3; c++) {
-        poses_f << R(r,c);
+      if(verbose) {
+        std::cout<<"\x1B[2K"<<"\x1B[0E";
+        std::cout<<(boost::format("%d/%d %6.2f%% complete...") % (pose_index+1) % (n_poses) % (100.0*pose_index/double(n_poses)));
+        std::flush(std::cout);
       }
+
+      for(int i=0; i<9; i++) {
+        R(i/3,i%3) = (double)(*pose_it)["R"][i];
+      }
+
+      for(int i=0; i<3; i++) {
+        p(i) = (double)(*pose_it)["p"][i];
+      }
+
+      // Render the images
+      if(pose_index == 0) {
+        // TODO: First one is always broken for some reason...
+        renderer.lookAt(p(0),p(1),p(2),R(0,0),R(0,1),R(0,2));
+        renderer.render(image, depth, mask);
+      }
+      renderer.lookAt(p(0),p(1),p(2),R(0,0),R(0,1),R(0,2));
+      renderer.render(image, depth, mask);
+
+      // Save the images and poses to disk
+      write_images(pose_index, poses_output_file, R, p, image, depth, mask);
     }
-    poses_f << "]";
 
-    poses_f << "T" << "[:";
-    for(int c=0; c<3; c++) {
-      poses_f << T(c);
+    poses_output_file << "]";
+
+    poses_input_file.release();
+
+  } else {
+
+    // Construct the render iterator
+    RendererIterator renderer_iterator = RendererIterator(&renderer, steps,
+        -180, 180, 20,
+        0.10, 0.50, 0.2);
+
+    n_poses = (int)renderer_iterator.n_templates();
+
+    // Store the final number of poses in the yaml file
+    poses_output_file << "n_poses" << n_poses;
+
+    // Begin the list of poses in the yaml file
+    poses_output_file << "poses" << "[";
+
+    for (size_t i = 0; !renderer_iterator.isDone(); ++i, ++renderer_iterator) {
+      cv::Mat image, depth, mask;
+      cv::Matx33d R;
+      cv::Vec3d p;
+
+      // Output status
+      if(verbose) {
+        std::cout<<"\x1B[2K"<<"\x1B[0E";
+        std::cout<<(boost::format("%d/%d %6.2f%% complete...") % (i+1) % (n_poses) % (100.0*i/double(n_poses)));
+        std::flush(std::cout);
+      }
+
+      // Render the images
+      renderer_iterator.render(image, depth, mask);
+
+      // Get transform
+      R = renderer_iterator.R();
+      p = renderer_iterator.T();
+
+      // Save the images and poses to disk
+      write_images(i, poses_output_file, R, p, image, depth, mask);
     }
-    poses_f <<"]";
 
-    poses_f << "}";
-
-    // Write out the images
-    cv::imwrite(boost::str(boost::format("depth_%05d.png") % (i)), depth);
-    cv::imwrite(boost::str(boost::format("image_%05d.png") % (i)), image);
-    cv::imwrite(boost::str(boost::format("mask_%05d.png") % (i)), mask);
+    poses_output_file << "]";
   }
 
-  poses_f << "]";
 
-  poses_f.release();
+  poses_output_file.release();
 
   std::cout<<std::endl;
 

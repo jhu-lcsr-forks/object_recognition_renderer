@@ -54,6 +54,8 @@ if (${USE_GLUT})
                                              ${GLUT_LIBRARIES}
                                              freeimage
                                              boost_program_options
+                                             boost_system
+                                             boost_filesystem
   )
   if (ROS_GROOVY_FOUND)
   install(TARGETS ${PROJECT_NAME}_glut
@@ -77,6 +79,8 @@ else()
                                                OSMesa GLU
                                                freeimage
                                                boost_program_options
+                                               boost_system
+                                               boost_filesystem
   )
   if (ROS_GROOVY_FOUND)
   install(TARGETS ${PROJECT_NAME}_osmesa

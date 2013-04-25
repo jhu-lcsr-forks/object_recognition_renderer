@@ -133,7 +133,13 @@ public:
   /**
    * @param file_path the path of the mesh to render
    */
-  RendererIterator(Renderer * renderer, size_t n_points);
+  RendererIterator(Renderer * renderer, size_t n_points,
+      double angle_min,
+      double angle_max,
+      double angle_step,
+      double radius_min,
+      double radius_max,
+      double radius_step);
 
   /** Iterate to get to a different view
    * We don't implement the postfix operator on purpose
@@ -186,9 +192,9 @@ private:
   /** The renderer object containing the scene and that will render images */
   Renderer* renderer_;
   /** Values for the angle sampling in degrees */
-  int angle_min_, angle_max_, angle_step_, angle_;
+  double angle_min_, angle_max_, angle_step_, angle_;
   /** Values for the scale sampling */
-  float radius_min_, radius_max_, radius_step_, radius_;
+  double radius_min_, radius_max_, radius_step_, radius_;
 };
 
 #endif /* RENDERER_H_ */

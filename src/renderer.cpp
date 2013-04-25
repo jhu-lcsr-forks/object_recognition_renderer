@@ -154,8 +154,8 @@ Renderer::lookAt(GLdouble x, GLdouble y, GLdouble z, GLdouble upx, GLdouble upy,
 
   glCallList(scene_list_);
 
-  cv::Mat image_out, depth_out, mask_out;
-  Renderer::render(image_out, depth_out, mask_out);
+  //cv::Mat image_out, depth_out, mask_out;
+  //Renderer::render(image_out, depth_out, mask_out);
 }
 
 void
@@ -196,14 +196,10 @@ Renderer::render(cv::Mat &image_out, cv::Mat &depth_out, cv::Mat &mask_out) cons
       {
         mask(j, i) = 255;
         // Figure the inclusive bounding box of the mask
-        if (j > j_max)
-          j_max = j;
-        else if (j < j_min)
-          j_min = j;
-        if (i > i_max)
-          i_max = i;
-        else if (i < i_min)
-          i_min = i;
+        j_min = std::min(j_min, j);
+        j_max = std::max(j_max, j);
+        i_min = std::min(i_min, i);
+        i_max = std::max(i_max, i);
       }
     }
 
@@ -220,7 +216,17 @@ Renderer::render(cv::Mat &image_out, cv::Mat &depth_out, cv::Mat &mask_out) cons
     --j_min;
   if (j_max < height_ - 1)
     ++j_max;
-  cv::Rect rect(i_min, j_min, i_max - i_min + 1, j_max - j_min + 1);
+  
+  int width = i_max-i_min + 1;
+  int height = j_max-j_min + 1;
+
+  if(width < 0 || height < 0) {
+    i_min = j_min = 0;
+    width = 1;
+    height = 1;
+  }
+
+  cv::Rect rect(i_min, j_min, width, height);
 
   depth_scale(rect).copyTo(depth_out);
   image(rect).copyTo(image_out);
@@ -229,18 +235,26 @@ Renderer::render(cv::Mat &image_out, cv::Mat &depth_out, cv::Mat &mask_out) cons
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-RendererIterator::RendererIterator(Renderer *renderer, size_t n_points)
+RendererIterator::RendererIterator(Renderer *renderer, 
+    size_t n_points,
+    double angle_min = -80,
+    double angle_max = 80,
+    double angle_step = 40,
+    double radius_min = 0.4,
+    double radius_max = 0.8,
+    double radius_step = 0.2
+    )
     :
       n_points_(n_points),
       index_(0),
       renderer_(renderer),
-      angle_min_(-80),
-      angle_max_(80),
-      angle_step_(40),
+      angle_min_(angle_min),
+      angle_max_(angle_max),
+      angle_step_(angle_step),
       angle_(angle_min_),
-      radius_min_(0.4),
-      radius_max_(0.8),
-      radius_step_(0.2),
+      radius_min_(radius_min),
+      radius_max_(radius_max),
+      radius_step_(radius_step),
       radius_(radius_min_)
 {
 }
@@ -310,7 +324,10 @@ RendererIterator::T() const
 size_t
 RendererIterator::n_templates() const
 {
-  return ((angle_max_ - angle_min_) / angle_step_ + 1) * n_points_ * ((radius_max_ - radius_min_) / radius_step_ + 1);
+  return 
+    n_points_ 
+    * std::ceil((angle_max_ - angle_min_) / angle_step_ + 1) 
+    * std::ceil((radius_max_ - radius_min_) / radius_step_ + 1);
 }
 
 /**
