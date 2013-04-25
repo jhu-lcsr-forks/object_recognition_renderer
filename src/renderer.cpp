@@ -159,7 +159,7 @@ Renderer::lookAt(GLdouble x, GLdouble y, GLdouble z, GLdouble upx, GLdouble upy,
 }
 
 void
-Renderer::render(cv::Mat &image_out, cv::Mat &depth_out, cv::Mat &mask_out) const
+Renderer::render(cv::Mat &image_out, cv::Mat &depth_out, cv::Mat &mask_out, bool do_crop) const
 {
   // Create images to copy the buffers to
   cv::Mat_ < cv::Vec3b > image(height_, width_);
@@ -208,29 +208,33 @@ Renderer::render(cv::Mat &image_out, cv::Mat &depth_out, cv::Mat &mask_out) cons
   depth.convertTo(depth_scale, CV_16UC1, 1e3);
 
   // Crop the images, just so that they are smaller to write/read
-  if (i_min > 0)
-    --i_min;
-  if (i_max < width_ - 1)
-    ++i_max;
-  if (j_min > 0)
-    --j_min;
-  if (j_max < height_ - 1)
-    ++j_max;
-  
-  int width = i_max-i_min + 1;
-  int height = j_max-j_min + 1;
+  cv::Rect output_rect(0,0,width_,height_);
 
-  if(width < 0 || height < 0) {
-    i_min = j_min = 0;
-    width = 1;
-    height = 1;
+  if(do_crop) {
+    if (i_min > 0)
+      --i_min;
+    if (i_max < width_ - 1)
+      ++i_max;
+    if (j_min > 0)
+      --j_min;
+    if (j_max < height_ - 1)
+      ++j_max;
+
+    int width = i_max-i_min + 1;
+    int height = j_max-j_min + 1;
+
+    if(width < 0 || height < 0) {
+      i_min = j_min = 0;
+      width = 1;
+      height = 1;
+    }
+    
+    output_rect = cv::Rect(i_min, j_min, width, height);
   }
 
-  cv::Rect rect(i_min, j_min, width, height);
-
-  depth_scale(rect).copyTo(depth_out);
-  image(rect).copyTo(image_out);
-  mask(rect).copyTo(mask_out);
+  depth_scale(output_rect).copyTo(depth_out);
+  image(output_rect).copyTo(image_out);
+  mask(output_rect).copyTo(mask_out);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

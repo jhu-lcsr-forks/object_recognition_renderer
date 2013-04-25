@@ -96,7 +96,7 @@ public:
    * @param mask_out the mask image
    */
   void
-  render(cv::Mat &image_out, cv::Mat &depth_out, cv::Mat &mask_out) const;
+  render(cv::Mat &image_out, cv::Mat &depth_out, cv::Mat &mask_out, bool do_crop=false) const;
 
 protected:
   virtual void
