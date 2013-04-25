@@ -118,6 +118,45 @@ Renderer::set_parameters(size_t width, size_t height, double focal_length_x, dou
 }
 
 void
+Renderer::positionObject(GLdouble x, GLdouble y, GLdouble z,
+                         GLdouble wx, GLdouble wy, GLdouble wz, GLdouble a)
+{
+  bind_buffers();
+
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+
+  // Look forward along z with y up
+  gluLookAt(0.0, 0.0, 0.0, 
+            0.0, 0.0, 1.0,
+            0.0, -1.0, 0.0);
+  
+  // Move the model to the desired position
+  glTranslatef(x, y, z);
+  
+  // Rotate the model to the desired orientation
+  glRotatef(a, wx, wy, wz);
+
+  
+  // if the display list has not been made yet, create a new one and
+  // fill it with scene contents
+  if (scene_list_ == 0)
+  {
+    scene_list_ = glGenLists(1);
+    glNewList(scene_list_, GL_COMPILE);
+    // now begin at the root node of the imported data and traverse
+    // the scenegraph by multiplying subsequent local transforms
+    // together on GL's matrix stack.
+    model_->Draw();
+    glEndList();
+  }
+
+  glCallList(scene_list_);
+}
+
+void
 Renderer::lookAt(GLdouble x, GLdouble y, GLdouble z, GLdouble upx, GLdouble upy, GLdouble upz)
 {
   bind_buffers();

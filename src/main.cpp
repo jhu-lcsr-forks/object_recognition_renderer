@@ -35,6 +35,7 @@
 
 #define GL_GLEXT_PROTOTYPES
 
+#include <cmath>
 #include <iostream>
 #include <stdlib.h>
 
@@ -141,6 +142,7 @@ main(int argc, char **argv)
   renderer.set_parameters(width, height, focal_length_x, focal_length_y, near, far);
 
   // Working variables
+  std::string pose_type = "";
   int n_poses = 0;
 
   // Open the yaml file
@@ -161,6 +163,9 @@ main(int argc, char **argv)
     // Load yaml file with metadata and poses
     fs::path poses_yaml_path = fs::path(vm["poses"].as<std::string>().c_str());
     cv::FileStorage poses_input_file(poses_yaml_path.string(), cv::FileStorage::READ);
+
+    // Get the pose type (camera or object)
+    poses_input_file["pose_type"] >> pose_type;
 
     // Store the final number of poses in the yaml file
     poses_input_file["n_poses"] >> n_poses;
@@ -204,7 +209,22 @@ main(int argc, char **argv)
         renderer.lookAt(p(0),p(1),p(2),R(0,0),R(0,1),R(0,2));
         renderer.render(image, depth, mask);
       }
-      renderer.lookAt(p(0),p(1),p(2),R(0,0),R(0,1),R(0,2));
+
+      if(pose_type == "camera") {
+        renderer.lookAt(p(0),p(1),p(2),R(0,0),R(0,1),R(0,2));
+      } else {
+        // Convert the rotation mat to axis/angle rep
+        double a = acos((cv::trace(R) - 1.0)/2.0);
+        cv::Vec3d w = (a < 1E-6) ? 
+          (cv::Vec3d(1,0,0)) :
+          (1.0/2.0/sin(a)*cv::Vec3d(R(2,1) - R(1,2), 
+                                     R(0,2) - R(2,0),
+                                     R(1,0) - R(0,1)));
+        std::cout<<"angle: "<<a<<" axis: "<<w<<std::endl;
+        renderer.positionObject(p(0),p(1),p(2),
+                                w(0),w(1),w(2),a*180.0/M_PI);
+      }
+
       renderer.render(image, depth, mask);
 
       // Save the images and poses to disk

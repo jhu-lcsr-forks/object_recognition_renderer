@@ -90,6 +90,10 @@ public:
   void
   lookAt(GLdouble x, GLdouble y, GLdouble z, GLdouble upx, GLdouble upy, GLdouble upz);
 
+  void
+  positionObject(GLdouble x, GLdouble y, GLdouble z,
+                 GLdouble wx, GLdouble wy, GLdouble wz, GLdouble a);
+
   /** Renders the content of the current OpenGL buffers to images
    * @param image_out the RGB image
    * @param depth_out the depth image
