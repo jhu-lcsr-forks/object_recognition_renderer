@@ -35,6 +35,8 @@
 
 #include <object_recognition_renderer/renderer.h>
 
+#include <opencv2/imgproc/imgproc.hpp>
+
 #include <iostream>
 #include <stdlib.h>
 
@@ -156,6 +158,8 @@ Renderer::positionObject(GLdouble x, GLdouble y, GLdouble z,
   glCallList(scene_list_);
 }
 
+
+
 void
 Renderer::lookAt(GLdouble x, GLdouble y, GLdouble z, GLdouble upx, GLdouble upy, GLdouble upz)
 {
@@ -274,6 +278,12 @@ Renderer::render(cv::Mat &image_out, cv::Mat &depth_out, cv::Mat &mask_out, bool
   depth_scale(output_rect).copyTo(depth_out);
   image(output_rect).copyTo(image_out);
   mask(output_rect).copyTo(mask_out);
+
+  cv::Mat M = (cv::Mat_<float>(2,3) << 1,0,0, 0,-1,0 );
+  
+  cv::flip(depth_scale,depth_out,0);
+  cv::flip(image,image_out,0);
+  cv::flip(mask,mask_out,0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
