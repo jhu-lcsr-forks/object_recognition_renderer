@@ -37,8 +37,6 @@ INCLUDE_DIRECTORIES(SYSTEM ${OpenCV_INCLUDE_DIR}
 )
 
 if (${USE_GLUT})
-  add_definitions(-DUSE_RENDERER_GLUT=1)
-
   find_package(GLUT)
   include_directories(SYSTEM ${GLUT_INCLUDE_DIR})
 
@@ -48,6 +46,7 @@ if (${USE_GLUT})
                                    renderer_glut.cpp
                                    ${EXTRA_SOURCES}
   )
+  set_target_properties(${PROJECT_NAME}_glut PROPERTIES COMPILE_FLAGS "-DUSE_RENDERER_GLUT=1")
   target_link_libraries(${PROJECT_NAME}_glut ${EXTRA_LIBRARIES}
                                              ${OpenCV_LIBRARIES}
                                              ${OPENGL_LIBRARIES}
@@ -66,14 +65,16 @@ if (${USE_GLUT})
           DESTINATION lib
   )
   endif()
-else()
+endif()
+
+if(${USE_OSMESA})
   # add an OSMesa version of the renderer
   add_library(${PROJECT_NAME}_osmesa model.cpp
                                      renderer.cpp
                                      renderer_osmesa.cpp
                                      ${EXTRA_SOURCES}
   )
-
+  set_target_properties(${PROJECT_NAME}_osmesa PROPERTIES COMPILE_FLAGS "-DUSE_RENDERER_OSMESA=1")
   target_link_libraries(${PROJECT_NAME}_osmesa ${EXTRA_LIBRARIES}
                                                ${OpenCV_LIBRARIES}
                                                OSMesa GLU
@@ -100,6 +101,7 @@ SET_PROPERTY(TARGET view_generator PROPERTY DEBUG_POSTFIX ${ASSIMP_DEBUG_POSTFIX
 TARGET_LINK_LIBRARIES(view_generator ${EXTRA_LIBRARIES})
 
 if (${USE_GLUT})
+  set_target_properties(view_generator PROPERTIES COMPILE_FLAGS "-DUSE_RENDERER_GLUT=1")
   target_link_libraries(view_generator ${PROJECT_NAME}_glut)
 else()
   target_link_libraries(view_generator ${PROJECT_NAME}_osmesa)

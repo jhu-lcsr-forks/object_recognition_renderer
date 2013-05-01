@@ -6,14 +6,17 @@ find_package(OpenCV REQUIRED)
 
 find_package(catkin REQUIRED)
 
-option(USE_GLUT "Use GLUT instead of OSMesa" ON)
+option(USE_GLUT "Use GLUT" ON)
+option(USE_OSMESA "Use OSMesa" ON)
 
 if (${USE_GLUT})
-  set(${PROJECT_NAME}_export_libs ${PROJECT_NAME}_glut)
-  set(${PROJECT_NAME}_include_files ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/renderer_glut.h)
-else()
-  set(${PROJECT_NAME}_export_libs ${PROJECT_NAME}_osmesa)
-  set(${PROJECT_NAME}_include_files ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/renderer_osmesa.h)
+  list(APPEND ${PROJECT_NAME}_export_libs ${PROJECT_NAME}_glut)
+  list(APPEND ${PROJECT_NAME}_include_files ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/renderer_glut.h)
+endif()
+
+if (${USE_OSMESA})
+  list(APPEND ${PROJECT_NAME}_export_libs ${PROJECT_NAME}_osmesa)
+  list(APPEND ${PROJECT_NAME}_include_files ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/renderer_osmesa.h)
 endif()
 
 if (${catkin_VERSION} VERSION_GREATER "0.5.28")
