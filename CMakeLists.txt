@@ -6,7 +6,7 @@ find_package(OpenCV REQUIRED)
 
 find_package(catkin REQUIRED)
 
-option(USE_GLUT "Use GLUT" OFF)
+option(USE_GLUT "Use GLUT" ON)
 option(USE_OSMESA "Use OSMesa" ON)
 
 if (${USE_GLUT})
